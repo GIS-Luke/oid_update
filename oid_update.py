@@ -1,24 +1,20 @@
-# OIDupdate.py exists because esri software can not make views of tables which
-# do not have an OBJECTID field. It can be done via SQL if you have the access
-# This script truncates esri tables and appends the rows from SSIS tables so
-# that the esri tables can participate in spatial views.
-# Registering with the geodatabase would have the same effect, however
-# the source tables are recreated overnight.
-# Updating the records in registered table was the better workflow.
-# 20220504 edited to include truncate and append from dbvw to fc that must
-# occure after OID update.
-# 20230221 Added Path Animal register block
+""" OIDupdate.py exists because esri software can not make views of tables which
+ do not have an OBJECTID field. It can be done via SQL if you have the access
+ This script truncates esri tables and appends the rows from SSIS tables so
+ that the esri tables can participate in spatial views.
+ Registering with the geodatabase would have the same effect, however
+ the source tables are recreated overnight.
+ Updating the records in registered table was the better workflow.
+ 20220504 edited to include truncate and append from dbvw to fc that must
+ occure after OID update.
+ 20230221 Added Path Animal register block
+ 20240805 Truncate removal, sendErrorEmail removal
+ and adding 'gis.gisdba.' update.
+"""
 import arcpy as ap
-import os
-import sys
-# make sure this path is correct and it contains sendErrorEmail.py script
-scriptdir = 'D:\ArcGISCatalog\PYs\email_errors'
-sys.path.insert(0, scriptdir)
-scriptName = os.path.basename(__file__) 
-from sendErrorEmail import sendEmail
 
 gis = r'\\cappgis10\d$\ArcGISCatalog\SDEConnections\cdbpsql20GISgisdba.sde'
-
+gg = 'gis.gisdba.'
 ap.env.workspace = gis
 
 # update the following in ALPHABETICAL ORDER
@@ -72,50 +68,56 @@ terms_field = 'Planning_Terms'
 disc_field = 'Document_Disclaimer'
 docs_field = 'Assoc_Documents'
 
-try:
-    for tbl in tbls:
-        tbl_1 = tbl + '_1'
-        ap.TruncateTable_management(tbl_1)
-        ap.Append_management(tbl, tbl_1, 'NO_TEST')
-        if tbl == 'ExportFromPathwayPlanning':
-            ap.CalculateField_management(tbl_1, terms_field, terms,
-                                            'PYTHON_9.3')
-            ap.CalculateField_management(tbl_1, disc_field, disclaimer,
-                                            'PYTHON_9.3')
-            ap.CalculateField_management(tbl_1, docs_field, docs_expression,
-                                        'PYTHON_9.3')
-    # Next block added upon request by GIS Coordinator
-    active = 'ExportfromPathwayAnimals_Active_1'
-    unregistered = 'ExportfromPathwayAnimals_Unregistered_1'
-    combined = 'ExportfromPathwayAnimals_ActiveUnregCombined'
-    ap.TruncateTable_management(combined)
-    ap.Append_management(active,
-                         combined,
-                         'NO_TEST')
-    ap.CalculateField_management(combined,
-                                 'Source',
-                                 '"Animals_Active"',#ap sql quote quirk
-                                 'PYTHON_9.3')
-    ap.Append_management(unregistered,
-                         combined,
-                         'NO_TEST')
-    unreg = 'unregistered'
-    # ALL SQL or FIELD NAME so only one set of quotes needed
-    # since no strings
-    animal_where = 'Source IS NULL'
-    ap.MakeTableView_management(combined,
-                                unreg,
-                                animal_where)
-    ap.CalculateField_management(unreg,
-                                 'Source',
-                                 '"Animals_Unregistered"',
-                                 'PYTHON_9.3')
-    # Another block requested by coordinator
-    fc = 'DbVw_PthWy_Animals_RegUnreg_PtsHistUniq_AllRecords_MappedAndUnmapped_fc'
-    fcs = ['DbVw_PthWy_Animals_RegUnreg_PtsHistUniq_AllRecords',
-           'DbVw_PthWy_Animals_RegUnreg_PtsHistUniq_AllRecords_NonMapping']
-    ap.management.TruncateTable(fc)
-    ap.management.Append(fcs, fc, 'NO_TEST')
-
-except Exception as error:
-    sendEmail(scriptName, str(error))
+for tbl in tbls:
+    gg_tbl_1 = gg + tbl + '_1'
+    ap.DeleteRows_management(gg_tbl_1)
+    gg_tbl = gg + tbl
+    ap.Append_management(gg_tbl, gg_tbl_1, 'NO_TEST')
+    if tbl == 'ExportFromPathwayPlanning':
+        ap.CalculateField_management(gg_tbl_1,
+                                     terms_field,
+                                     terms,
+                                     'PYTHON3')
+        ap.CalculateField_management(gg_tbl_1,
+                                     disc_field,
+                                     disclaimer,
+                                     'PYTHON3')
+        ap.CalculateField_management(gg_tbl_1,
+                                     docs_field,
+                                     docs_expression,
+                                     'PYTHON3')
+# Next block added upon request by GIS Coordinator
+active = gg + 'ExportfromPathwayAnimals_Active_1'
+unregistered = gg + 'ExportfromPathwayAnimals_Unregistered_1'
+combined = gg + 'ExportfromPathwayAnimals_ActiveUnregCombined'
+#ap.TruncateTable_management(combined)
+ap.DeleteRows_management(combined)
+ap.Append_management(active,
+                     combined,
+                     'NO_TEST')
+ap.CalculateField_management(combined,
+                             'Source',
+                             '"Animals_Active"',#ap sql quote quirk
+                             'PYTHON3')
+ap.Append_management(unregistered,
+                     combined,
+                     'NO_TEST')
+unreg = 'unregistered'
+# ALL SQL or FIELD NAME so only one set of quotes needed
+# since no strings
+animal_where = 'Source IS NULL'
+ap.MakeTableView_management(combined,
+                            unreg,
+                            animal_where)
+ap.CalculateField_management(unreg,
+                             'Source',
+                             '"Animals_Unregistered"',
+                             'PYTHON3')
+# Another block requested by coordinator
+fc = gg + 'DbVw_PthWy_Animals_RegUnreg_PtsHistUniq_AllRecords_MappedAndUnmapped_fc'
+fcs = [gg + 'DbVw_PthWy_Animals_RegUnreg_PtsHistUniq_AllRecords',
+       gg + 'DbVw_PthWy_Animals_RegUnreg_PtsHistUniq_AllRecords_NonMapping']
+ap.DeleteRows_management(fc)
+ap.Append_management(fcs,
+                     fc,
+                     'NO_TEST')
