@@ -1,3 +1,4 @@
+
 """ OIDupdate.py exists because esri software can not make views of tables which
  do not have an OBJECTID field. It can be done via SQL if you have the access
  This script truncates esri tables and appends the rows from SSIS tables so
@@ -10,11 +11,11 @@
  20230221 Added Path Animal register block
  20240805 Truncate removal, sendErrorEmail removal
  and adding 'gis.gisdba.' update.
+ 20240813 Removed 'gis.gisdba.' after database fix.
 """
 import arcpy as ap
 
 gis = r'\\cappgis10\d$\ArcGISCatalog\SDEConnections\cdbpsql20GISgisdba.sde'
-gg = 'gis.gisdba.'
 ap.env.workspace = gis
 
 # update the following in ALPHABETICAL ORDER
@@ -69,27 +70,26 @@ disc_field = 'Document_Disclaimer'
 docs_field = 'Assoc_Documents'
 
 for tbl in tbls:
-    gg_tbl_1 = gg + tbl + '_1'
-    ap.DeleteRows_management(gg_tbl_1)
-    gg_tbl = gg + tbl
-    ap.Append_management(gg_tbl, gg_tbl_1, 'NO_TEST')
+    tbl_1 = tbl + '_1'
+    ap.DeleteRows_management(tbl_1)
+    ap.Append_management(tbl, tbl_1, 'NO_TEST')
     if tbl == 'ExportFromPathwayPlanning':
-        ap.CalculateField_management(gg_tbl_1,
+        ap.CalculateField_management(tbl_1,
                                      terms_field,
                                      terms,
                                      'PYTHON3')
-        ap.CalculateField_management(gg_tbl_1,
+        ap.CalculateField_management(tbl_1,
                                      disc_field,
                                      disclaimer,
                                      'PYTHON3')
-        ap.CalculateField_management(gg_tbl_1,
+        ap.CalculateField_management(tbl_1,
                                      docs_field,
                                      docs_expression,
                                      'PYTHON3')
 # Next block added upon request by GIS Coordinator
-active = gg + 'ExportfromPathwayAnimals_Active_1'
-unregistered = gg + 'ExportfromPathwayAnimals_Unregistered_1'
-combined = gg + 'ExportfromPathwayAnimals_ActiveUnregCombined'
+active = 'ExportfromPathwayAnimals_Active_1'
+unregistered = 'ExportfromPathwayAnimals_Unregistered_1'
+combined = 'ExportfromPathwayAnimals_ActiveUnregCombined'
 #ap.TruncateTable_management(combined)
 ap.DeleteRows_management(combined)
 ap.Append_management(active,
@@ -114,9 +114,9 @@ ap.CalculateField_management(unreg,
                              '"Animals_Unregistered"',
                              'PYTHON3')
 # Another block requested by coordinator
-fc = gg + 'DbVw_PthWy_Animals_RegUnreg_PtsHistUniq_AllRecords_MappedAndUnmapped_fc'
-fcs = [gg + 'DbVw_PthWy_Animals_RegUnreg_PtsHistUniq_AllRecords',
-       gg + 'DbVw_PthWy_Animals_RegUnreg_PtsHistUniq_AllRecords_NonMapping']
+fc = 'DbVw_PthWy_Animals_RegUnreg_PtsHistUniq_AllRecords_MappedAndUnmapped_fc'
+fcs = ['DbVw_PthWy_Animals_RegUnreg_PtsHistUniq_AllRecords',
+       'DbVw_PthWy_Animals_RegUnreg_PtsHistUniq_AllRecords_NonMapping']
 ap.DeleteRows_management(fc)
 ap.Append_management(fcs,
                      fc,
